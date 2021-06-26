@@ -1,9 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectID } = require("mongodb");
 
 const app = express();
+
 app.use(express.json());
 app.use(cors());
 
@@ -23,6 +24,58 @@ const client = new MongoClient(uri, {
 client.connect((err) => {
   const adminCollection = client.db(dbName).collection(admins);
   const blogCollection = client.db(dbName).collection(blogs);
+
+  // admin login:
+
+  app.post("/login", async (req, res) => {
+    const { email, password } = req.body;
+
+    const admin = await adminCollection.findOne({ email: email });
+
+    const adminPass = admin.password;
+
+    if (!email) {
+      res.status(400).json({ error: "Email Doesn't Exist!" });
+    }
+
+    if (adminPass !== password) {
+      res.status(400).json({ error: "Wrong Email and Password Combination!" });
+    } else {
+      res.send(true);
+    }
+  });
+
+  // get blogs
+  app.get("/blogList", (req, res) => {
+    blogCollection.find().toArray((err, documents) => {
+      if (!err) {
+        res.send(documents);
+      } else res.send(err.message);
+    });
+  });
+
+  // add blogs:
+
+  app.post("/addBlog", (req, res) => {
+    const newBlog = req.body;
+
+    blogCollection
+      .insertOne(newBlog)
+      .then((result) => {
+        res.send(result.insertedCount > 0);
+      })
+      .catch((error) => {
+        res.send(error);
+      });
+  });
+
+  // delete blog:
+  app.delete("/deleteBlog/:id", (req, res) => {
+    const id = ObjectID(req.params.id);
+    blogCollection
+      .findOneAndDelete({ _id: id })
+      .then((documents) => res.send(documents.value));
+  });
 
   if (err) {
     console.log(err.message);
